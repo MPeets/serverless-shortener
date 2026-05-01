@@ -45,3 +45,4 @@ terraform.rc
 
 __pycache__/
 app/function.zip
+.pytest_cache/
