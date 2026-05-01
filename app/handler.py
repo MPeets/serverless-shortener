@@ -91,7 +91,7 @@ def _new_slug():
 
 def _table():
     table_name = os.environ["TABLE_NAME"]
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    region = os.environ.get("AWS_REGION", "eu-north-1")
     return boto3.resource("dynamodb", region_name=region).Table(table_name)
 
 
