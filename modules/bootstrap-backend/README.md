@@ -16,7 +16,7 @@ with local state first.
 Use the project AWS profile and confirm the account before applying:
 
 ```bash
-export AWS_PROFILE=serverless-shortener
+export AWS_PROFILE={your-user}
 aws sts get-caller-identity
 aws configure get region
 ```
