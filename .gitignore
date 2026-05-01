@@ -44,3 +44,4 @@ terraform.rc
 # planout
 
 __pycache__/
+app/function.zip
