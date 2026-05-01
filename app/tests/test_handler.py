@@ -14,11 +14,11 @@ TABLE_NAME = "test-short-links"
 def table(monkeypatch):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_REGION", "eu-north-1")
     monkeypatch.setenv("TABLE_NAME", TABLE_NAME)
 
     with mock_aws():
-        dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+        dynamodb = boto3.resource("dynamodb", region_name="eu-north-1")
         table = dynamodb.create_table(
             TableName=TABLE_NAME,
             KeySchema=[{"AttributeName": "slug", "KeyType": "HASH"}],
