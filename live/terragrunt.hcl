@@ -22,7 +22,7 @@ generate "backend" {
 terraform {
   backend "s3" {
     bucket         = "serverless-shortener-terraform-state-497201305684"
-    key            = "${path_relative_to_include()}/terraform.tfstate"
+    key            = "${replace(path_relative_to_include(), "\\", "/")}/terraform.tfstate"
     region         = "${local.aws_region}"
     dynamodb_table = "serverless-shortener-terraform-locks"
     encrypt        = true
@@ -36,17 +36,6 @@ generate "provider" {
   if_exists = "overwrite_terragrunt"
 
   contents = <<EOF
-terraform {
-  required_version = ">= 1.6.0"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
 provider "aws" {
   region = "${local.aws_region}"
 }
