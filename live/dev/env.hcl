@@ -8,7 +8,7 @@ locals {
   api_name          = "shortener-dev"
   stage_name        = "$default"
 
-  lambda_zip_path = "../../../app/function.zip"
+  lambda_zip_path = "${get_terragrunt_dir()}/../../app/function.zip"
 
   log_retention_days     = 3
   memory_mb              = 128
