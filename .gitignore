@@ -30,7 +30,7 @@ override.tf.json
 # !example_override.tf
 
 # Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
-# example: *tfplan*
+*tfplan*
 
 # Ignore CLI configuration files
 .terraformrc
@@ -47,3 +47,8 @@ __pycache__/
 app/function.zip
 .pytest_cache/
 bootstrap/
+
+# Terragrunt generated files and cache
+.terragrunt-cache/
+backend.tf
+provider.tf
