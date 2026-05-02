@@ -12,6 +12,12 @@ terraform {
 
 dependency "lambda" {
   config_path = "../lambda"
+
+  mock_outputs_allowed_terraform_commands = ["validate"]
+  mock_outputs = {
+    function_name = "mock"
+    invoke_arn    = "arn:aws:apigateway:eu-north-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-north-1:000000000000:function:mock/invocations"
+  }
 }
 
 inputs = {
