@@ -1,0 +1,144 @@
+stages:
+  - validate
+  - plan
+  - apply
+
+variables:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TERRAGRUNT_NON_INTERACTIVE: "true"
+  TERRAGRUNT_DOWNLOAD: "$CI_PROJECT_DIR/.terragrunt-cache"
+  AWS_REGION: "eu-north-1"
+  AWS_ROLE_ARN_DEV: "arn:aws:iam::497201305684:role/terragrunt-dev-deployer"
+  AWS_ROLE_ARN_PROD: "arn:aws:iam::497201305684:role/terragrunt-prod-deployer"
+
+default:
+  image: alpine:3.20
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .terragrunt-cache/
+
+.terraform_tools:
+  before_script:
+    - apk add --no-cache aws-cli bash curl jq python3 py3-pip unzip
+    - curl -fsSL "https://releases.hashicorp.com/terraform/1.10.5/terraform_1.10.5_linux_amd64.zip" -o terraform.zip
+    - unzip -q terraform.zip -d /usr/local/bin
+    - curl -fsSL "https://github.com/gruntwork-io/terragrunt/releases/download/v0.72.6/terragrunt_linux_amd64" -o /usr/local/bin/terragrunt
+    - chmod +x /usr/local/bin/terragrunt
+    - curl -fsSL "https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh" | bash
+    - bash app/package.sh
+
+.aws_oidc:
+  id_tokens:
+    GITLAB_OIDC_TOKEN:
+      aud: https://gitlab.com
+  before_script:
+    - !reference [.terraform_tools, before_script]
+    - |
+      credentials="$(aws sts assume-role-with-web-identity \
+        --role-arn "$AWS_ROLE_ARN" \
+        --role-session-name "gitlab-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${CI_JOB_ID}" \
+        --web-identity-token "$GITLAB_OIDC_TOKEN" \
+        --duration-seconds 3600 \
+        --query 'Credentials' \
+        --output json)"
+      export AWS_ACCESS_KEY_ID="$(echo "$credentials" | jq -r '.AccessKeyId')"
+      export AWS_SECRET_ACCESS_KEY="$(echo "$credentials" | jq -r '.SecretAccessKey')"
+      export AWS_SESSION_TOKEN="$(echo "$credentials" | jq -r '.SessionToken')"
+
+tflint:
+  stage: validate
+  extends: .terraform_tools
+  rules:
+    - when: always
+  script:
+    - terraform fmt -check -recursive
+    - cd live
+    - terragrunt run-all validate
+    - cd "$CI_PROJECT_DIR"
+    - tflint --recursive
+
+python-test:
+  stage: validate
+  rules:
+    - when: always
+  before_script:
+    - apk add --no-cache python3 py3-pip
+    - python3 -m venv .venv
+    - . .venv/bin/activate
+    - pip install -r app/requirements-dev.txt
+  script:
+    - . .venv/bin/activate
+    - pytest app/tests/
+
+plan-dev:
+  stage: plan
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_DEV"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cd live/dev
+    - bash -o pipefail -c 'terragrunt run-all plan -out=tfplan | tee plan.log'
+  artifacts:
+    name: "dev-tfplan-$CI_COMMIT_SHORT_SHA"
+    expire_in: 1 day
+    paths:
+      - live/dev/plan.log
+      - live/dev/**/tfplan
+
+plan-prod:
+  stage: plan
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_PROD"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cd live/prod
+    - bash -o pipefail -c 'terragrunt run-all plan -out=tfplan | tee plan.log'
+  artifacts:
+    name: "prod-tfplan-$CI_COMMIT_SHORT_SHA"
+    expire_in: 1 day
+    paths:
+      - live/prod/plan.log
+      - live/prod/**/tfplan
+
+apply-dev:
+  stage: apply
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_DEV"
+  needs:
+    - job: plan-dev
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  environment:
+    name: dev
+  resource_group: live/dev
+  script:
+    - cd live/dev
+    - terragrunt run-all apply tfplan
+
+apply-prod:
+  stage: apply
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_PROD"
+  needs:
+    - job: plan-prod
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  environment:
+    name: prod
+  resource_group: live/prod
+  script:
+    - cd live/prod
+    - terragrunt run-all apply tfplan

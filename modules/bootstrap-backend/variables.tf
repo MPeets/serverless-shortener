@@ -19,3 +19,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "gitlab_project_path" {
+  description = "GitLab namespace/project path allowed to assume deployer roles through OIDC."
+  type        = string
+  default     = "mihkelpeets65/serverless-shortener"
+}
+
+variable "dev_deployer_role_name" {
+  description = "Name of the IAM role GitLab CI assumes for dev Terragrunt deployments."
+  type        = string
+  default     = "terragrunt-dev-deployer"
+}
+
+variable "prod_deployer_role_name" {
+  description = "Name of the IAM role GitLab CI assumes for prod Terragrunt deployments."
+  type        = string
+  default     = "terragrunt-prod-deployer"
+}
