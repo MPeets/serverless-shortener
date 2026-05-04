@@ -70,3 +70,37 @@ python-test:
   script:
     - . .venv/bin/activate
     - pytest app/tests/
+
+plan-dev:
+  stage: plan
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_DEV"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cd live/dev
+    - terragrunt run-all plan -out=tfplan
+  artifacts:
+    name: "dev-tfplan-$CI_COMMIT_SHORT_SHA"
+    expire_in: 1 day
+    paths:
+      - live/dev/**/tfplan
+
+plan-prod:
+  stage: plan
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_PROD"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cd live/prod
+    - terragrunt run-all plan -out=tfplan
+  artifacts:
+    name: "prod-tfplan-$CI_COMMIT_SHORT_SHA"
+    expire_in: 1 day
+    paths:
+      - live/prod/**/tfplan
