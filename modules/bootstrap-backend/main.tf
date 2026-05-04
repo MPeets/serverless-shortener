@@ -52,6 +52,12 @@ resource "aws_dynamodb_table" "locks" {
   tags = var.tags
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
+
+data "aws_region" "current" {}
+
 data "tls_certificate" "gitlab" {
   url = "https://gitlab.com"
 }
@@ -111,4 +117,152 @@ resource "aws_iam_role" "prod_deployer" {
   name               = var.prod_deployer_role_name
   assume_role_policy = data.aws_iam_policy_document.gitlab_deployer_assume_role.json
   tags               = var.tags
+}
+
+locals {
+  deployer_targets = {
+    dev = {
+      role_name     = aws_iam_role.dev_deployer.name
+      table_name    = "shortener-dev"
+      function_name = "shortener-dev"
+    }
+    prod = {
+      role_name     = aws_iam_role.prod_deployer.name
+      table_name    = "shortener-prod"
+      function_name = "shortener-prod"
+    }
+  }
+}
+
+data "aws_iam_policy_document" "gitlab_deployer" {
+  for_each = local.deployer_targets
+
+  statement {
+    actions = [
+      "sts:GetCallerIdentity",
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    actions = [
+      "s3:ListBucket",
+    ]
+
+    resources = [
+      aws_s3_bucket.state.arn,
+    ]
+  }
+
+  statement {
+    actions = [
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+
+    resources = [
+      "${aws_s3_bucket.state.arn}/*",
+    ]
+  }
+
+  statement {
+    actions = [
+      "dynamodb:CreateTable",
+      "dynamodb:DeleteItem",
+      "dynamodb:DeleteTable",
+      "dynamodb:DescribeContinuousBackups",
+      "dynamodb:DescribeTable",
+      "dynamodb:GetItem",
+      "dynamodb:ListTagsOfResource",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:TagResource",
+      "dynamodb:UntagResource",
+      "dynamodb:UpdateTable",
+    ]
+
+    resources = [
+      aws_dynamodb_table.locks.arn,
+      "arn:${data.aws_partition.current.partition}:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${each.value.table_name}",
+    ]
+  }
+
+  statement {
+    actions = [
+      "lambda:AddPermission",
+      "lambda:CreateFunction",
+      "lambda:DeleteFunction",
+      "lambda:GetFunction",
+      "lambda:GetFunctionCodeSigningConfig",
+      "lambda:GetPolicy",
+      "lambda:ListVersionsByFunction",
+      "lambda:RemovePermission",
+      "lambda:TagResource",
+      "lambda:UntagResource",
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
+    ]
+
+    resources = [
+      "arn:${data.aws_partition.current.partition}:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${each.value.function_name}",
+    ]
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:DeleteLogGroup",
+      "logs:DescribeLogGroups",
+      "logs:ListTagsForResource",
+      "logs:PutRetentionPolicy",
+      "logs:TagResource",
+      "logs:UntagResource",
+    ]
+
+    resources = [
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${each.value.function_name}",
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${each.value.function_name}:*",
+    ]
+  }
+
+  statement {
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:DeleteRolePolicy",
+      "iam:GetRole",
+      "iam:GetRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:PassRole",
+      "iam:PutRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:UpdateAssumeRolePolicy",
+    ]
+
+    resources = [
+      "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${each.value.function_name}-role",
+    ]
+  }
+
+  statement {
+    actions = [
+      "apigateway:*",
+    ]
+
+    resources = [
+      "arn:${data.aws_partition.current.partition}:apigateway:${data.aws_region.current.name}::/apis",
+      "arn:${data.aws_partition.current.partition}:apigateway:${data.aws_region.current.name}::/apis/*",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "gitlab_deployer" {
+  for_each = local.deployer_targets
+
+  name   = "serverless-shortener-${each.key}-deploy"
+  role   = each.value.role_name
+  policy = data.aws_iam_policy_document.gitlab_deployer[each.key].json
 }
