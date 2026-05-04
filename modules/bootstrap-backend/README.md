@@ -6,6 +6,8 @@ Terragrunt:
 - An S3 bucket for state files
 - S3 bucket versioning, encryption, ownership controls, and public access block
 - A DynamoDB table for state locking
+- A GitLab OIDC identity provider for CI authentication
+- Dev and prod deployer roles for Terragrunt pipelines
 
 Bootstrap is intentionally a two-step process. The backend resources cannot
 store their own state in S3 until they already exist, so run this module once
@@ -52,6 +54,8 @@ module "backend" {
   bucket_name     = "serverless-shortener-terraform-state-497201305684"
   lock_table_name = "serverless-shortener-terraform-locks"
 
+  gitlab_project_path = "mihkelpeets65/serverless-shortener"
+
   tags = {
     Project   = "serverless-shortener"
     ManagedBy = "terraform"
@@ -77,6 +81,15 @@ Record the outputs:
 ```bash
 terraform output
 ```
+
+The GitLab CI pipeline expects these role names by default:
+
+- `terragrunt-dev-deployer`
+- `terragrunt-prod-deployer`
+
+If you override `dev_deployer_role_name` or `prod_deployer_role_name`, update
+`AWS_ROLE_ARN_DEV` and `AWS_ROLE_ARN_PROD` in `.gitlab-ci.yml` to match the
+resulting output ARNs.
 
 ## 4. Use the Remote Backend
 
