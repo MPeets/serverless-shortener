@@ -82,11 +82,12 @@ plan-dev:
     - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - cd live/dev
-    - terragrunt run-all plan -out=tfplan
+    - bash -o pipefail -c 'terragrunt run-all plan -out=tfplan | tee plan.log'
   artifacts:
     name: "dev-tfplan-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 day
     paths:
+      - live/dev/plan.log
       - live/dev/**/tfplan
 
 plan-prod:
@@ -99,11 +100,12 @@ plan-prod:
     - if: '$CI_COMMIT_BRANCH == "main"'
   script:
     - cd live/prod
-    - terragrunt run-all plan -out=tfplan
+    - bash -o pipefail -c 'terragrunt run-all plan -out=tfplan | tee plan.log'
   artifacts:
     name: "prod-tfplan-$CI_COMMIT_SHORT_SHA"
     expire_in: 1 day
     paths:
+      - live/prod/plan.log
       - live/prod/**/tfplan
 
 apply-dev:
