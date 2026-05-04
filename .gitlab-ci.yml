@@ -104,3 +104,38 @@ plan-prod:
     expire_in: 1 day
     paths:
       - live/prod/**/tfplan
+
+apply-dev:
+  stage: apply
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_DEV"
+  needs:
+    - job: plan-dev
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  environment:
+    name: dev
+  resource_group: live/dev
+  script:
+    - cd live/dev
+    - terragrunt run-all apply tfplan
+
+apply-prod:
+  stage: apply
+  extends: .aws_oidc
+  variables:
+    AWS_ROLE_ARN: "$AWS_ROLE_ARN_PROD"
+  needs:
+    - job: plan-prod
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  environment:
+    name: prod
+  resource_group: live/prod
+  script:
+    - cd live/prod
+    - terragrunt run-all apply tfplan
