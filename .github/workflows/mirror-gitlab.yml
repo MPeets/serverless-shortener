@@ -18,4 +18,6 @@ jobs:
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          git push --mirror "https://oauth2:${GITLAB_TOKEN}@gitlab.com/mihkelpeets65/serverless-shortener.git"
+          URL="https://oauth2:${GITLAB_TOKEN}@gitlab.com/mihkelpeets65/serverless-shortener.git"
+          git push --force "$URL" --all
+          git push --force "$URL" --tags
